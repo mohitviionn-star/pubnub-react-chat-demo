@@ -55,12 +55,13 @@ export function useDmChat(args: {
           timetoken: String(e.timetoken),
         };
 
-        // ✅ DEDUPE
+        // ✅ DEDUPE and keep chronological order
         setMessages((prev) => {
           const id = normalized.id;
           if (idsRef.current.has(id)) return prev;
           idsRef.current.add(id);
-          return [...prev, normalized];
+          const next = [...prev, normalized];
+          return next.sort((a, b) => a.createdAt - b.createdAt);
         });
       },
 
@@ -90,6 +91,7 @@ export function useDmChat(args: {
     pn.subscribe({ channels: [channel], withPresence: false });
 
     // ✅ Load history (requires Message Persistence enabled)
+    // Merge with current state so real-time messages that arrived during fetch are not lost.
     (async () => {
       try {
         const hist = await (pn as any).fetchMessages({
@@ -113,7 +115,14 @@ export function useDmChat(args: {
         // ✅ Dedupe-set fill from history too
         loaded.forEach((m) => idsRef.current.add(m.id));
 
-        if (!cancelled) setMessages(loaded);
+        if (!cancelled) {
+          // Merge history with current messages (don't overwrite — real-time may have arrived during fetch)
+          setMessages((prev) => {
+            const byId = new Map<string, ChatMessage>();
+            [...prev, ...loaded].forEach((m) => byId.set(m.id, m));
+            return [...byId.values()].sort((a, b) => a.createdAt - b.createdAt);
+          });
+        }
       } catch {
         if (!cancelled) {
           idsRef.current = new Set();

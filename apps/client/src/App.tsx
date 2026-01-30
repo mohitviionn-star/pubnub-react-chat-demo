@@ -88,7 +88,7 @@ export default function App() {
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="topbar">
           <div>
-            <div style={{ fontWeight: 900 }}>PubNub Chat Demo</div>
+            <div className="h1" style={{ marginBottom: 2 }}>PubNub Chat Demo</div>
             <div className="small muted">
               Signed in as <b>{session.me.name}</b> ({session.me.id})
             </div>
