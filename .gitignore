@@ -1,0 +1,22 @@
+# deps
+**/node_modules
+**/.pnp
+**/.pnp.js
+
+# env (never commit)
+**/.env
+**/.env.*
+!**/.env.example
+
+# builds
+**/dist
+**/build
+**/.next
+**/.vite
+**/*.log
+
+# OS/IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
