@@ -22,7 +22,6 @@ export default function App() {
   const [pn, setPn] = useState<PubNub | null>(null);
   const [err, setErr] = useState<string>("");
 
-  // Load demo users
   useEffect(() => {
     api
       .get("/users")
@@ -30,7 +29,6 @@ export default function App() {
       .catch(() => setErr("Failed to load users"));
   }, []);
 
-  // Create PubNub client when logged in
   useEffect(() => {
     if (!session) return;
 
@@ -52,7 +50,6 @@ export default function App() {
     };
   }, [session]);
 
-  // ✅ IMPORTANT: Hooks must be called on EVERY render
   const me = session?.me ?? null;
   const presenceChannel = session?.pubnub.presenceChannel ?? "";
 
@@ -70,7 +67,6 @@ export default function App() {
     channel,
   });
 
-  // ✅ Now it's safe to conditionally render UI
   if (!session) {
     return (
       <Login
@@ -162,10 +158,6 @@ export default function App() {
           onTyping={setTyping}
         />
       </div>
-
-      <p className="muted small" style={{ marginTop: 14 }}>
-        Open in <b>two tabs</b> with two different users to test real-time chat.
-      </p>
     </div>
   );
 }

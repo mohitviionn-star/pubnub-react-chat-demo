@@ -11,21 +11,24 @@ export default function Login(props: {
   const [err, setErr] = useState<string>("");
 
   useEffect(() => {
-    api.get("/users")
+    api
+      .get("/users")
       .then((r) => setUsers(r.data.users))
       .catch(() => setErr("Failed to load users from server"));
   }, []);
 
   const selectedUser = useMemo(
     () => users.find((u) => u.id === selected) || null,
-    [users, selected]
+    [users, selected],
   );
 
   const login = async () => {
     setErr("");
     setLoading(true);
     try {
-      const r = await api.post<LoginResponse>("/auth/login", { userId: selected });
+      const r = await api.post<LoginResponse>("/auth/login", {
+        userId: selected,
+      });
       props.onLoggedIn(r.data);
     } catch (e: any) {
       setErr(e?.response?.data?.message || "Login failed");
@@ -37,11 +40,19 @@ export default function Login(props: {
   return (
     <div className="container">
       <div className="card" style={{ padding: 18 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 16,
+            alignItems: "center",
+          }}
+        >
           <div>
             <p className="h1">PubNub Chat Demo</p>
             <p className="muted" style={{ margin: "6px 0 0" }}>
-              Choose a demo user and open the app in <b>two browser tabs</b> to chat in real time.
+              Choose a demo user and open the app in <b>two browser tabs</b> to
+              chat in real time.
             </p>
           </div>
           <div className="badge">
@@ -66,11 +77,38 @@ export default function Login(props: {
                 background: "rgba(255,255,255,.04)",
                 color: "var(--text)",
                 outline: "none",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                fontSize: "14px",
+                fontWeight: 500,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.border = "1px solid rgba(110,231,255,.5)";
+                e.currentTarget.style.background = "rgba(255,255,255,.06)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.border = "1px solid var(--border)";
+                e.currentTarget.style.background = "rgba(255,255,255,.04)";
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.border = "1px solid rgba(110,231,255,.7)";
+                e.currentTarget.style.background = "rgba(255,255,255,.08)";
+                e.currentTarget.style.boxShadow =
+                  "0 0 0 3px rgba(110,231,255,.1)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.border = "1px solid var(--border)";
+                e.currentTarget.style.background = "rgba(255,255,255,.04)";
+                e.currentTarget.style.boxShadow = "none";
               }}
             >
               {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name} ({u.id})
+                <option
+                  key={u.id}
+                  value={u.id}
+                  style={{ background: "var(--bg)", color: "var(--text)" }}
+                >
+                  {u.name}
                 </option>
               ))}
             </select>
@@ -83,16 +121,19 @@ export default function Login(props: {
               padding: "12px 16px",
               borderRadius: 12,
               border: "1px solid rgba(110,231,255,.35)",
-              background: "linear-gradient(90deg, rgba(110,231,255,.30), rgba(168,85,247,.24))",
+              background:
+                "linear-gradient(90deg, rgba(110,231,255,.30), rgba(168,85,247,.24))",
               color: "var(--text)",
               cursor: loading ? "wait" : "pointer",
             }}
           >
-            {loading ? "Signing in…" : "Enter"}
+            {loading ? "Signing in…" : "Sing In"}
           </button>
         </div>
 
-        {err ? <p style={{ color: "var(--bad)", marginTop: 12 }}>{err}</p> : null}
+        {err ? (
+          <p style={{ color: "var(--bad)", marginTop: 12 }}>{err}</p>
+        ) : null}
 
         <p className="muted small" style={{ marginTop: 14 }}>
           Tip: run server on <code>5050</code> and client on <code>5173</code>.

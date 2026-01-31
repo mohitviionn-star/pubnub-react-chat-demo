@@ -20,18 +20,16 @@ app.use(
   cors({
     origin: CORS_ORIGIN,
     credentials: false,
-  })
+  }),
 );
 
-// ---- Demo users (replace with DB in production) ----
 const DEMO_USERS = [
-  { id: "alice", name: "Alice Johnson" },
-  { id: "bob", name: "Bob Singh" },
-  { id: "carol", name: "Carol Mehta" },
-  { id: "david", name: "David Khan" },
+  { id: "1", name: "Jhon" },
+  { id: "2", name: "Bob" },
+  { id: "3", name: "Carol" },
+  { id: "4", name: "David" },
 ];
 
-// ---- PubNub admin client (uses secretKey, must stay server-side) ----
 const publishKey = process.env.PUBNUB_PUBLISH_KEY;
 const subscribeKey = process.env.PUBNUB_SUBSCRIBE_KEY;
 const secretKey = process.env.PUBNUB_SECRET_KEY;
@@ -39,12 +37,11 @@ const ttlMinutes = Number(process.env.PUBNUB_TOKEN_TTL_MINUTES || 60);
 
 if (!publishKey || !subscribeKey || !secretKey) {
   console.error(
-    "Missing PubNub keys. Set PUBNUB_PUBLISH_KEY, PUBNUB_SUBSCRIBE_KEY, PUBNUB_SECRET_KEY in apps/server/.env"
+    "Missing PubNub keys. Set PUBNUB_PUBLISH_KEY, PUBNUB_SUBSCRIBE_KEY, PUBNUB_SECRET_KEY in apps/server/.env",
   );
   process.exit(1);
 }
 
-// In PAM v3 docs, this is called "authorized_uuid" (aka userId/UUID).
 const pubnubAdmin = new PubNub({
   publishKey,
   subscribeKey,
@@ -55,17 +52,11 @@ const pubnubAdmin = new PubNub({
 
 const PRESENCE_CHANNEL = "presence.global";
 
-// Small helper for safe regex embedding
 function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function issueTokenForUser(userId) {
-  // Allow:
-  // 1) presence channel (read + join)
-  // 2) DM channels that include this userId: dm.<a>--<b>
-  //
-  // NOTE: PubNub PAM v3 supports regex patterns under `patterns.channels`.
   const u = escapeRegExp(userId);
   const dmPattern = `^dm\\.(?:${u}--.*|.*--${u})$`;
 
@@ -83,7 +74,6 @@ async function issueTokenForUser(userId) {
   return token;
 }
 
-// ---- Routes ----
 app.get("/health", (_req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
 });
@@ -119,14 +109,61 @@ app.post("/auth/login", async (req, res) => {
     });
   } catch (err) {
     if (err?.name === "ZodError") {
-      return res.status(400).json({ message: "Invalid payload", details: err.errors });
+      return res
+        .status(400)
+        .json({ message: "Invalid payload", details: err.errors });
     }
     console.error(err);
     return res.status(500).json({ message: "Server error" });
   }
 });
 
+app.post("/admin/purge-dm", async (req, res) => {
+  try {
+    const { userId, peerId } = req.body || {};
+    if (!userId || !peerId)
+      return res.status(400).json({ message: "userId & peerId required" });
+
+    const [a, b] = [userId, peerId].sort();
+    const channel = `dm.${a}--${b}`;
+
+    await pubnubAdmin.deleteMessages({ channel });
+
+    return res.json({ ok: true, channel });
+  } catch (e) {
+    console.error(e);
+    return res
+      .status(500)
+      .json({ message: "Purge failed", error: String(e?.message || e) });
+  }
+});
+
+app.post("/admin/purge-all-dms", async (_req, res) => {
+  try {
+    const ids = DEMO_USERS.map((u) => u.id);
+    const channels = [];
+
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const [a, b] = [ids[i], ids[j]].sort();
+        channels.push(`dm.${a}--${b}`);
+      }
+    }
+
+    for (const ch of channels) {
+      await pubnubAdmin.deleteMessages({ channel: ch });
+    }
+
+    return res.json({ ok: true, deletedChannels: channels });
+  } catch (e) {
+    console.error(e);
+    return res
+      .status(500)
+      .json({ message: "Purge failed", error: String(e?.message || e) });
+  }
+});
+
 app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
-  console.log(`✅ CORS origin: ${CORS_ORIGIN}`);
+  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(` CORS origin: ${CORS_ORIGIN}`);
 });

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type PubNub from "pubnub";
 import { typingSignal } from "../lib/channels";
 import type { ChatMessage, DemoUser } from "../types";
@@ -18,7 +19,6 @@ export function useDmChat(args: {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [peerTyping, setPeerTyping] = useState(false);
 
-  // ✅ Dedupe set: prevents "optimistic + echo" double messages
   const idsRef = useRef<Set<string>>(new Set());
 
   const typingTimer = useRef<number | null>(null);
@@ -28,7 +28,6 @@ export function useDmChat(args: {
     return `Chat with ${peer.name}`;
   }, [peer]);
 
-  // ✅ Reset when switching channel (changing peer)
   useEffect(() => {
     setMessages([]);
     setPeerTyping(false);
@@ -42,9 +41,10 @@ export function useDmChat(args: {
 
     const listener = {
       message: (e: any) => {
-        if (e.channel !== channel) return;
+        const eventChannel = e.channel ?? e.actualChannel ?? e.subscription;
+        if (eventChannel !== channel) return;
 
-        const msg = (e.message ?? {}) as any;
+        const msg = (e.message ?? e.payload ?? {}) as any;
 
         const normalized: ChatMessage = {
           id: msg?.id ?? String(e.timetoken),
@@ -55,12 +55,15 @@ export function useDmChat(args: {
           timetoken: String(e.timetoken),
         };
 
-        // ✅ DEDUPE
-        setMessages((prev) => {
-          const id = normalized.id;
-          if (idsRef.current.has(id)) return prev;
-          idsRef.current.add(id);
-          return [...prev, normalized];
+        const id = normalized.id;
+        if (idsRef.current.has(id)) return;
+        idsRef.current.add(id);
+
+        flushSync(() => {
+          setMessages((prev) => {
+            const next = [...prev, normalized];
+            return next.sort((a, b) => a.createdAt - b.createdAt);
+          });
         });
       },
 
@@ -69,7 +72,6 @@ export function useDmChat(args: {
         const text = String(e.message || "");
         if (!peer) return;
 
-        // typing signal format: t:<userId>:<0|1>
         const parts = text.split(":");
         if (parts.length === 3 && parts[0] === "t" && parts[1] === peer.id) {
           const on = parts[2] === "1";
@@ -89,7 +91,6 @@ export function useDmChat(args: {
     pn.addListener(listener);
     pn.subscribe({ channels: [channel], withPresence: false });
 
-    // ✅ Load history (requires Message Persistence enabled)
     (async () => {
       try {
         const hist = await (pn as any).fetchMessages({
@@ -110,10 +111,15 @@ export function useDmChat(args: {
           };
         });
 
-        // ✅ Dedupe-set fill from history too
         loaded.forEach((m) => idsRef.current.add(m.id));
 
-        if (!cancelled) setMessages(loaded);
+        if (!cancelled) {
+          setMessages((prev) => {
+            const byId = new Map<string, ChatMessage>();
+            [...prev, ...loaded].forEach((m) => byId.set(m.id, m));
+            return [...byId.values()].sort((a, b) => a.createdAt - b.createdAt);
+          });
+        }
       } catch {
         if (!cancelled) {
           idsRef.current = new Set();
@@ -143,11 +149,8 @@ export function useDmChat(args: {
       createdAt: nowMs(),
     };
 
-    // ✅ add to dedupe BEFORE optimistic add,
-    // so when PubNub echoes it back we ignore it.
     idsRef.current.add(msg.id);
 
-    // Optimistic UI
     setMessages((prev) => [...prev, msg]);
 
     try {
@@ -157,10 +160,7 @@ export function useDmChat(args: {
         storeInHistory: true,
         customMessageType: "text",
       });
-    } catch {
-      // Optional: mark failed in UI.
-      // For demo we keep it simple.
-    }
+    } catch {}
   };
 
   const setTyping = async (on: boolean) => {
@@ -174,9 +174,7 @@ export function useDmChat(args: {
         message: payload,
         customMessageType: "typing",
       });
-    } catch {
-      // ignore
-    }
+    } catch {}
   };
 
   return { messages, send, title, peerTyping, setTyping };

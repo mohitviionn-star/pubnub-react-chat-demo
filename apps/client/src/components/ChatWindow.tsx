@@ -14,13 +14,17 @@ export default function ChatWindow(props: {
   const listRef = useRef<HTMLDivElement | null>(null);
   const lastTypingSentRef = useRef<number>(0);
 
-  const canSend = useMemo(() => text.trim().length > 0 && !!props.peer, [text, props.peer]);
+  const canSend = useMemo(
+    () => text.trim().length > 0 && !!props.peer,
+    [text, props.peer],
+  );
 
+  const lastMessageId = props.messages[props.messages.length - 1]?.id;
   useEffect(() => {
     const el = listRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [props.messages.length]);
+  }, [props.messages.length, lastMessageId]);
 
   const sendNow = () => {
     if (!canSend) return;
@@ -32,7 +36,6 @@ export default function ChatWindow(props: {
   const onChange = (v: string) => {
     setText(v);
 
-    // Very small typing debounce to keep signals low
     const now = Date.now();
     const shouldSend = now - lastTypingSentRef.current > 900;
     if (props.peer && shouldSend) {
@@ -80,12 +83,23 @@ export default function ChatWindow(props: {
         ) : (
           props.messages.map((m) => (
             <div className="msgrow" key={m.id}>
-              <div className={"msg" + (m.senderId === props.me.id ? " me" : "")}>
+              <div
+                className={"msg" + (m.senderId === props.me.id ? " me" : "")}
+              >
                 <div className="t">{m.text}</div>
                 <div className="meta">
-                  <span>{m.senderId === props.me.id ? "You" : m.senderName || m.senderId}</span>
+                  <span>
+                    {m.senderId === props.me.id
+                      ? "You"
+                      : m.senderName || m.senderId}
+                  </span>
                   <span>•</span>
-                  <span>{new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                  <span>
+                    {new Date(m.createdAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
                 </div>
               </div>
             </div>
@@ -99,7 +113,11 @@ export default function ChatWindow(props: {
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={onKeyDown}
           disabled={!props.peer}
-          placeholder={props.peer ? "Type a message and press Enter…" : "Select a user to enable chat"}
+          placeholder={
+            props.peer
+              ? "Type a message and press Enter…"
+              : "Select a user to enable chat"
+          }
         />
         <button onClick={sendNow} disabled={!canSend}>
           Send

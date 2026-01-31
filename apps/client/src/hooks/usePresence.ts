@@ -8,7 +8,6 @@ export function usePresence(pn: PubNub | null, presenceChannel: string) {
   const [conn, setConn] = useState<ConnectionState>("connecting");
   const onlineRef = useRef<Set<string>>(new Set());
 
-  // keep a stable Set instance for renders
   const onlineList = useMemo(() => Array.from(online).sort(), [online]);
 
   useEffect(() => {
@@ -16,7 +15,6 @@ export function usePresence(pn: PubNub | null, presenceChannel: string) {
 
     const listener = {
       status: (s: any) => {
-        // Common categories: PNConnectedCategory, PNNetworkDownCategory, PNReconnectedCategory, etc.
         if (
           s.category === "PNConnectedCategory" ||
           s.category === "PNReconnectedCategory"
@@ -41,10 +39,8 @@ export function usePresence(pn: PubNub | null, presenceChannel: string) {
 
     pn.addListener(listener);
 
-    // Subscribe to presence channel WITH presence events.
     pn.subscribe({ channels: [presenceChannel], withPresence: true });
 
-    // Initial online snapshot
     (async () => {
       try {
         const here = await (pn as any).hereNow({
@@ -58,9 +54,7 @@ export function usePresence(pn: PubNub | null, presenceChannel: string) {
         const next = new Set(uuids);
         onlineRef.current = next;
         setOnline(next);
-      } catch {
-        // If Presence isn't enabled, this will fail; the UI will still work but show unknown presence.
-      }
+      } catch {}
     })();
 
     return () => {
